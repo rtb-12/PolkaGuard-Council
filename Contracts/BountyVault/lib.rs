@@ -1,141 +1,144 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
 #[ink::contract]
-mod BountyVault {
+mod bounty_vault {
+    use ink::storage::Mapping;
 
-    /// Defines the storage of your contract.
-    /// Add new fields to the below struct in order
-    /// to add new static storage fields to your contract.
     #[ink(storage)]
     pub struct BountyVault {
-        /// Stores a single `bool` value on the storage.
-        value: bool,
+        /// Approved registry account to withdraw funds
+        registry: AccountId,
+        /// Tracks if a bounty has been claimed
+        claimed: Mapping<u64, bool>,
+        /// Fixed bounty amount per proof
+        bounty_amount: Balance,
+        /// Contract owner (for administrative functions)
+        owner: AccountId,
+    }
+
+    #[ink(event)]
+    pub struct Funded {
+        #[ink(topic)] 
+        from: AccountId,
+        #[ink(topic)] 
+        amount: Balance,
+    }
+
+    #[ink(event)]
+    pub struct Withdrawn {
+        #[ink(topic)] 
+        to: AccountId,
+        #[ink(topic)] 
+        proof_id: u64,
+        #[ink(topic)] 
+        amount: Balance,
+    }
+
+    impl Default for BountyVault {
+        fn default() -> Self {
+            Self::new(AccountId::from([0u8; 32]), 0)
+        }
     }
 
     impl BountyVault {
-        /// Constructor that initializes the `bool` value to the given `init_value`.
+        /// Instantiate vault with registry as the authorized withdrawer.
         #[ink(constructor)]
-        pub fn new(init_value: bool) -> Self {
-            Self { value: init_value }
+        pub fn new(registry: AccountId, bounty_amount: Balance) -> Self {
+            Self {
+                registry,
+                claimed: Mapping::default(),
+                bounty_amount,
+                owner: Self::env().caller(),
+            }
         }
 
-        /// Constructor that initializes the `bool` value to `false`.
-        ///
-        /// Constructors can delegate to other constructors.
-        #[ink(constructor)]
-        pub fn default() -> Self {
-            Self::new(Default::default())
+        /// Deposits native tokens into vault.
+        #[ink(message, payable)]
+        pub fn fund(&mut self) {
+            let amount = Self::env().transferred_value();
+            assert!(amount > 0, "Must send funds");
+            self.env().emit_event(Funded {
+                from: self.env().caller(),
+                amount,
+            });
         }
 
-        /// A message that can be called on instantiated contracts.
-        /// This one flips the value of the stored `bool` from `true`
-        /// to `false` and vice versa.
+        /// Withdraw bounty for approved proof.
+        /// Conditions:
+        /// - Called only by authorized registry.
+        /// - Checks if bounty for `proof_id` hasn't been claimed.
+        /// - Transfers fixed bounty amount.
         #[ink(message)]
-        pub fn flip(&mut self) {
-            self.value = !self.value;
+        pub fn withdraw(&mut self, proof_id: u64, to: AccountId) {
+            assert_eq!(
+                self.env().caller(),
+                self.registry,
+                "Only registry can initiate withdrawal"
+            );
+            assert!(
+                !self.claimed.get(proof_id).unwrap_or(false),
+                "Bounty already claimed"
+            );
+
+            let vault_balance = self.env().balance();
+            let amount = if self.bounty_amount > 0 {
+                // Use fixed bounty amount if set
+                assert!(vault_balance >= self.bounty_amount, "Insufficient funds in vault");
+                self.bounty_amount
+            } else {
+                // Use entire vault balance if no fixed amount
+                assert!(vault_balance > 0, "No funds in vault");
+                vault_balance
+            };
+
+            self.claimed.insert(proof_id, &true);
+            self.env().transfer(to, amount).expect("Transfer failed");
+
+            self.env().emit_event(Withdrawn {
+                to,
+                proof_id,
+                amount,
+            });
         }
 
-        /// Simply returns the current value of our `bool`.
+        /// Check if bounty for proof_id is already claimed.
         #[ink(message)]
-        pub fn get(&self) -> bool {
-            self.value
+        pub fn is_claimed(&self, proof_id: u64) -> bool {
+            self.claimed.get(proof_id).unwrap_or(false)
+        }
+
+        /// Get the authorized registry address
+        #[ink(message)]
+        pub fn get_registry(&self) -> AccountId {
+            self.registry
         }
     }
 
-    /// Unit tests in Rust are normally defined within such a `#[cfg(test)]`
-    /// module and test functions are marked with a `#[test]` attribute.
-    /// The below code is technically just normal Rust code.
     #[cfg(test)]
     mod tests {
-        /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
 
-        /// We test if the default constructor does its job.
+        #[ink::test]
+        fn constructor_works() {
+            let registry = AccountId::from([0x1; 32]);
+            let contract = BountyVault::new(registry);
+            assert_eq!(contract.get_registry(), registry);
+        }
+
         #[ink::test]
         fn default_works() {
-            let BountyVault = BountyVault::default();
-            assert_eq!(BountyVault.get(), false);
+            let contract = BountyVault::default();
+            assert_eq!(contract.get_registry(), AccountId::from([0u8; 32]));
         }
 
-        /// We test a simple use case of our contract.
         #[ink::test]
-        fn it_works() {
-            let mut BountyVault = BountyVault::new(false);
-            assert_eq!(BountyVault.get(), false);
-            BountyVault.flip();
-            assert_eq!(BountyVault.get(), true);
-        }
-    }
-
-
-    /// This is how you'd write end-to-end (E2E) or integration tests for ink! contracts.
-    ///
-    /// When running these you need to make sure that you:
-    /// - Compile the tests with the `e2e-tests` feature flag enabled (`--features e2e-tests`)
-    /// - Are running a Substrate node which contains `pallet-contracts` in the background
-    #[cfg(all(test, feature = "e2e-tests"))]
-    mod e2e_tests {
-        /// Imports all the definitions from the outer scope so we can use them here.
-        use super::*;
-
-        /// A helper function used for calling contract messages.
-        use ink_e2e::ContractsBackend;
-
-        /// The End-to-End test `Result` type.
-        type E2EResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
-        /// We test that we can upload and instantiate the contract using its default constructor.
-        #[ink_e2e::test]
-        async fn default_works(mut client: ink_e2e::Client<C, E>) -> E2EResult<()> {
-            // Given
-            let mut constructor = BountyVaultRef::default();
-
-            // When
-            let contract = client
-                .instantiate("BountyVault", &ink_e2e::alice(), &mut constructor)
-                .submit()
-                .await
-                .expect("instantiate failed");
-            let call_builder = contract.call_builder::<BountyVault>();
-
-            // Then
-            let get = call_builder.get();
-            let get_result = client.call(&ink_e2e::alice(), &get).dry_run().await?;
-            assert!(matches!(get_result.return_value(), false));
-
-            Ok(())
-        }
-
-        /// We test that we can read and write a value from the on-chain contract.
-        #[ink_e2e::test]
-        async fn it_works(mut client: ink_e2e::Client<C, E>) -> E2EResult<()> {
-            // Given
-            let mut constructor = BountyVaultRef::new(false);
-            let contract = client
-                .instantiate("BountyVault", &ink_e2e::bob(), &mut constructor)
-                .submit()
-                .await
-                .expect("instantiate failed");
-            let mut call_builder = contract.call_builder::<BountyVault>();
-
-            let get = call_builder.get();
-            let get_result = client.call(&ink_e2e::bob(), &get).dry_run().await?;
-            assert!(matches!(get_result.return_value(), false));
-
-            // When
-            let flip = call_builder.flip();
-            let _flip_result = client
-                .call(&ink_e2e::bob(), &flip)
-                .submit()
-                .await
-                .expect("flip failed");
-
-            // Then
-            let get = call_builder.get();
-            let get_result = client.call(&ink_e2e::bob(), &get).dry_run().await?;
-            assert!(matches!(get_result.return_value(), true));
-
-            Ok(())
+        fn claim_tracking_works() {
+            let registry = AccountId::from([0x1; 32]);
+            let mut contract = BountyVault::new(registry);
+            
+            assert!(!contract.is_claimed(1));
+            contract.claimed.insert(1, &true);
+            assert!(contract.is_claimed(1));
         }
     }
 }
