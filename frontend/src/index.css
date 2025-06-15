@@ -1,0 +1,91 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* PolkaGuard Dark Theme with Purple Accents */
+
+@layer base {
+  :root {
+    --background: 210 6% 7%;
+    --foreground: 210 40% 98%;
+
+    --card: 210 6% 9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 210 6% 9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 258 90% 66%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 180 25% 25%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 258 90% 66%;
+
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .hero-gradient {
+    background: linear-gradient(135deg, #121212 0%, #1a1a2e 50%, #16213e 100%);
+  }
+
+  .particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: linear-gradient(45deg, #7E57C2, #9C27B0);
+    border-radius: 50%;
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .glow-button {
+    @apply relative overflow-hidden;
+    transition: all 0.3s ease;
+  }
+
+  .glow-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(126, 87, 194, 0.3);
+  }
+
+  .glow-button::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-polka-purple to-polka-purple-dark;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .glow-button:hover::before {
+    opacity: 0.1;
+  }
+}
