@@ -1,5 +1,7 @@
 # PolkaGuard‑Council ⚖️
 
+PolkaGuard‑Council is the **token‑gated DAO extension** for PolkaGuard, introducing community‑driven approval and bounty distribution mechanisms. Built with Solidity smart contracts deployed on AssetHub (Polkadot's system parachain), it empowers PGT (PolkaGuard Token) holders to propose, vote, and authorize bounties in a transparent and secure on‑chain process.kaGuard‑Council ⚖️
+
 PolkaGuard‑Council is the **token‑gated DAO extension** for PolkaGuard, introducing community‑driven approval and bounty distribution mechanisms. Built as an upgrade to PolkaGuard's CLI toolkit, it empowers PGT (PolkaGuard Token) holders to propose, vote, and authorize bounties in a transparent and secure on‑chain process.olkaGuard‑Council ⚖️
 
 PolkaGuard‑Council is the **token‑gated DAO extension** for PolkaGuard, introducing community‑driven approval and bounty distribution mechanisms. Built as an upgrade to PolkaGuard’s CLI toolkit, it empowers PGT (PolkaGuard Token) holders to propose, vote, and authorize bounties in a transparent and secure on‑chain process.
@@ -44,15 +46,15 @@ PolkaGuard‑Council orchestrates a comprehensive bounty approval workflow that 
 #### Phase 2: On-Chain Verification
 
 4. **🚀 Deploy Verifier** → Auditor deploys VerifierContract to AssetHub
-5. **📝 Submit Proof** → Submit proof with public inputs and verifier address to ProofRegistry
-6. **🔍 Cryptographic Verification** → ProofRegistry calls VerifierContract to validate ZK proof
+5. **📝 Submit Proof** → Submit proof with public inputs and verifier address to ExploitProofRegistry
+6. **🔍 Cryptographic Verification** → ExploitProofRegistry calls VerifierContract to validate ZK proof
 7. **📢 Event Emission** → ProofSubmitted event triggers DAO notification
 
 #### Phase 3: Community Governance
 
 8. **🗳 DAO Voting** → PGT holders vote on bounty approval through token-weighted voting
-9. **💸 Automated Payout** → If approved, DAO triggers VaultContract for anonymous bounty payment
-10. **💰 Reward Distribution** → Auditor receives bounty funds automatically
+9. **💸 Automated Payout** → If approved, BountyDAO triggers BountyVault for anonymous bounty payment
+10. **💰 Reward Distribution** → Auditor receives ETH bounty funds automatically
 
 #### Phase 4: Report Disclosure (If Approved)
 
@@ -108,18 +110,19 @@ PolkaGuard‑Council orchestrates a comprehensive bounty approval workflow that 
 # Phase 1: Generate exploit proof with PolkaGuard CLI
 polkaguard exploit-report --target <contract_address> --output ./proof-package/
 
-# Phase 2: Deploy verifier and submit proof
-ink deploy verifier.sol
-ink call ProofRegistry submitProof <proof_data> <public_inputs> <verifier_addr>
+# Phase 2: Deploy verifier and submit proof to AssetHub
+npx hardhat deploy --network assethub
+npx hardhat run scripts/submitProof.js --network assethub
 
-# Phase 3: Community governance
-ink call PolkaGuardCouncil create_proposal <registry_addr> <proof_id>
-ink call PolkaGuardCouncil vote <proposal_id> true
-ink call PolkaGuardCouncil execute <proposal_id>
+# Phase 3: Community governance on AssetHub
+# Create proposal, vote, and execute via web interface or:
+npx hardhat run scripts/createProposal.js --network assethub
+npx hardhat run scripts/vote.js --network assethub
+npx hardhat run scripts/execute.js --network assethub
 
 # Phase 4: Optional report sharing (post-approval)
 ipfs add encrypted_full_report.json
-ink call PolkaGuardCouncil share_report <proposal_id> <ipfs_hash>
+# Update via frontend or contract call
 ```
 
 ---
@@ -160,12 +163,17 @@ ink call PolkaGuardCouncil share_report <proposal_id> <ipfs_hash>
 
 ```
 /
-├── contracts/
-│   ├── PolkaGuardToken/        # PSP22 governance token
-│   ├── ExploitProofRegistry/   # ZK proof registry (existing)
-│   ├── BountyVault/            # Funds escrow
-│   └── PolkaGuardCouncil/      # Token-gated DAO
-├── scripts/                    # Deployment & interaction scripts
+├── Contracts/
+│   ├── PolkaGuardToken/        # ERC20 governance token (Solidity)
+│   ├── ExploitProofRegistry/   # ZK proof registry (Solidity)
+│   ├── BountyVault/            # ETH funds escrow (Solidity)
+│   ├── BountyDAO/              # Token-gated DAO (Solidity)
+│   ├── deploy/                 # Hardhat deployment scripts
+│   ├── test/                   # Contract test suites
+│   ├── hardhat.config.ts       # Hardhat configuration
+│   └── package.json            # Node.js dependencies
+├── frontend/                   # React web interface
+├── scripts/                    # Utility scripts
 └── README.md                   # This file
 ```
 
